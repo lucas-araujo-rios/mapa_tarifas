@@ -13,19 +13,14 @@ chrome_options = Options()
 chrome_options.add_argument('--no-sandbox')
 driver = webdriver.Chrome(options=chrome_options)
 
-# rnaturalearth (paises com pop>10^6) + chatgpt + verificação manual 
-paises = [
-    "AFG", "AGO", "ALB", "ARE", "ARG", "ARM", "AUS", "AUT", "AZE", "BDI", "BEL", "BEN", "BFA", "BGD", "BGR", "BHR", "BIH",
-    "BLR", "BOL", "BRA", "BWA", "CAF", "CAN", "CHE", "CHL", "CHN", "CIV", "CMR", "ZAR", "COG", "COL", "CRI", "CUB", "CYP",
-    "CZE", "DEU", "DNK", "DOM", "DZA", "ECU", "EGY", "ERI", "ESP", "EST", "ETH", "FIN", "FRA", "GAB", "GBR", "GEO", "GHA",
-    "GIN", "GMB", "GNB", "GNQ", "GRC", "GTM", "HKG", "HND", "HRV", "HTI", "HUN", "IDN", "IND", "IRL", "IRN", "IRQ", "ISR",
-    "ITA", "JAM", "JOR", "JPN", "KAZ", "KEN", "KGZ", "KHM", "KOR", "KWT", "LAO", "LBN", "LBR", "LBY", "LKA", "LSO", "LTU",
-    "LVA", "MAR", "MDA", "MDG", "MEX", "MKD", "MLI", "MMR", "MNG", "MOZ", "MRT", "MUS", "MWI", "MYS", "NAM", "NER", "NGA",
-    "NIC", "NLD", "NOR", "NPL", "NZL", "OMN", "PAK", "PAN", "PER", "PHL", "PNG", "POL", "PRI", "PRK", "PRT", "PRY", "PSE",
-    "QAT", "ROM", "RUS", "RWA", "SAU", "SDN", "SEN", "SGP", "SLE", "SLV", "SOM", "SER", "SSD", "SVK", "SVN", "SWE", "SWZ",
-    "SYR", "TCD","TGO", "THA", "TJK", "TKM", "TTO", "TUN", "TUR", "TWN", "TZA", "UGA", "UKR", "URY", "USA", "UZB", "VEN",
-    "VNM", "YEM", "ZAF", "ZMB", "ZWE"
-]
+# descobrir lista de paises no site
+url = 'https://wits.worldbank.org/tariff/trains/en/country/AFG'
+response = requests.get(url)
+soup = BeautifulSoup(response.text, "html.parser")
+items = soup.find_all("h3",class_="countryHeading")
+links = [item.find("a").get("href") for item in items]
+links = [item.find("a").get("href") for item in items]
+paises = [re.search(r"/partner/([A-Z]{3})/", link).group(1) for link in links]
 
 # max de tentativas caso de erro
 max_tries = 3

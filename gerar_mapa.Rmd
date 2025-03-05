@@ -20,8 +20,8 @@ library(rnaturalearth)
 ## Ler os dados
 
 ```{r}
-p <- "C:/Users/unive/Downloads/"
-# p <- "C:/Users/unive/OneDrive/Área de Trabalho/UnB/codigos/Freela Tarifas/mapa_tarifas/dados"
+# p <- "C:/Users/unive/Downloads/"
+p <- "C:/Users/unive/OneDrive/Área de Trabalho/UnB/codigos/Freela Tarifas/mapa_tarifas/dados"
 arquivos <- list.files(path=p, pattern="^WITS", full.names=TRUE)
 tipos <- c("text","numeric","text","text","numeric","numeric","numeric","text")
 tabelas <- purrr::map(
@@ -35,12 +35,15 @@ tabelas <- purrr::map(
     return(tabela)
     }
   )
+```
+
+```{r}
 # junta tudo
 dados <- bind_rows(tabelas)
 # tira as linhas duplicadas
 dados <- unique(dados)
 # so linhas que sao trocadas
-dados <- dados |> filter(IsTraded=="Yes")
+# dados <- dados |> filter(IsTraded=="Yes")
 ```
 
 ## Tratar os dados
@@ -50,15 +53,14 @@ dados_media <- dados |>
   group_by(Reporter,Partner) |> 
   summarise(
     year = mean(Year,na.rm=T),
-    tarifa = mean(AppliedTariff,na.rm=T)
+    tarifa = round(mean(AppliedTariff,na.rm=T)/100,2)
     ) |> 
   ungroup()
 
 tarifas_EUA_pros_outros <- dados_media |> 
   filter(Reporter=="United States")
-
 tarifas_outros_pros_EUA <- dados_media |> 
-  filter(Reporter!="United_Stats")
+  filter(Reporter!="United States")
 
 tarifas_df <- left_join(
   tarifas_outros_pros_EUA,
@@ -67,23 +69,74 @@ tarifas_df <- left_join(
   reframe(
     pais = Reporter,
     ano = year.x,
-    tarifa_outro_pros_EUA = tarifa.x,
-    tarifa_EUA_pro_outro = tarifa.y,
-    diff = tarifa_outro_pros_EUA-tarifa_EUA_pro_outro
+    tarifa_outro_pros_EUA = round(tarifa.x,2),
+    tarifa_EUA_pro_outro = round(tarifa.y,2),
+    diff = round(tarifa_outro_pros_EUA-tarifa_EUA_pro_outro,2)
+    ) |> 
+  mutate(
+    diff_cat = factor(case_when(
+      diff == 0 ~ "Free trade agreement",
+      diff < 0 ~ "Lower than US tariffs",
+      diff >= 0  & diff < 0.02 ~ "Exceeds US tariffs by <2ppt",
+      diff >= 0.02  & diff < 0.05 ~ "Exceeds US tariffs by 2–5ppt",
+      diff >= 0.05  & diff < 0.10 ~ "Exceeds US tariffs by 5–10ppt",
+      diff >= 0.10 ~ "Exceeds US tariffs by ≥10ppt"
+    ),
+    levels = c(
+      "Free trade agreement","Lower than US tariffs","Exceeds US tariffs by <2ppt",
+      "Exceeds US tariffs by 2–5ppt","Exceeds US tariffs by 5–10ppt",
+      "Exceeds US tariffs by ≥10ppt"))
+  )
+
+terra <- ne_countries(scale = "medium", returnclass = "sf")
+base_mapa <- terra |> 
+  filter(iso_a3!="ATA", pop_est>10^6) |> 
+  select(pais=name_sort) |> 
+  left_join(
+    filter(
+      tarifas_df,
+      pais!="United States",!is.na(diff_cat)),
+    by=c("pais")
     )
 ```
 
 ## Gera mapa
 
 ```{r fig.height=8, fig.width=10}
-terra <- ne_countries(scale = "medium", returnclass = "sf")
-terra |> 
-  filter(iso_a3!="ATA", pop_est>10^6) |> 
-  select(pais=name_sort) |> 
-  left_join(filter(tarifas_df,pais!="United States"), by=join_by(pais)) |> 
-  ggplot(aes(fill=diff)) +
+base_mapa |> 
+  ggplot(aes(fill=diff_cat)) +
   geom_sf(color="black") +
+  scale_fill_manual(
+    values = c(
+      "Free trade agreement"="#3ba364",
+      "Lower than US tariffs"="#5df595",
+      "Exceeds US tariffs by <2ppt"="#1d567e",
+      "Exceeds US tariffs by 2–5ppt"="#43acfd",
+      "Exceeds US tariffs by 5–10ppt"="#f5258d",
+      "Exceeds US tariffs by ≥10ppt"="#f8c622")
+    ) + 
   coord_sf(crs="+proj=robin") +
-  theme_void()
+  labs(title="Tarifas dos países nos EUA Versus Tarifas dos EUA neles",fill="") +
+  theme_void() +
+  theme(
+    legend.position="top",
+    legend.key.size = unit(0.3,"cm"),
+    plot.title = element_text(hjust = 0.5,vjust=5)
+    )
+```
+
+```{r}
+base_mapa |> 
+  ggplot(aes(fill=diff_cat)) +
+  geom_sf(color="black") +
+  scale_fill_manual(
+    values = c(
+      "Free trade agreement"="#3ba364",
+      "Lower than US tariffs"="#5df595",
+      "Exceeds US tariffs by <2ppt"="#1d567e",
+      "Exceeds US tariffs by 2–5ppt"="#43acfd",
+      "Exceeds US tariffs by 5–10ppt"="#f5258d",
+      "Exceeds US tariffs by ≥10ppt"="#f8c622")
+    )
 ```
 
