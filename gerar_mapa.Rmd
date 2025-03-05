@@ -1,0 +1,89 @@
+---
+title: "gerar_mapa_tarifas"
+author: "lucas rios"
+date: "2025-03-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Pacotes
+
+```{r}
+library(tidyverse)
+library(sf)
+library(rnaturalearth)
+```
+
+## Ler os dados
+
+```{r}
+p <- "C:/Users/unive/Downloads/"
+p <- "C:/Users/unive/OneDrive/Área de Trabalho/UnB/codigos/Freela Tarifas/mapa_tarifas/dados"
+arquivos <- list.files(path=p, pattern="^WITS", full.names=TRUE)
+tipos <- c("text","numeric","text","text","numeric","numeric","numeric","text")
+tabelas <- purrr::map(
+  arquivos,
+  function(x){
+    tabela <- readxl::read_xlsx(x,col_types=tipos)
+    if(is_empty(tabela)){
+      tabela <- readxl::read_xlsx(x,sheet=2,col_types=tipos)
+    }
+    #cat(paste0("Concluído: ",x,"\n"))
+    return(tabela)
+    }
+  )
+# junta tudo
+dados <- bind_rows(tabelas)
+# tira as linhas duplicadas
+dados <- unique(dados)
+# so linhas que sao trocadas
+dados <- dados |> filter(IsTraded=="Yes")
+```
+
+## Tratar os dados
+
+```{r}
+dados_media <- dados |>
+  group_by(Reporter,Partner) |> 
+  summarise(
+    year = mean(Year,na.rm=T),
+    tarifa = mean(AppliedTariff,na.rm=T)
+    ) |> 
+  ungroup()
+
+tarifas_EUA_pros_outros <- dados_media |> 
+  filter(Reporter=="United States")
+
+tarifas_outros_pros_EUA <- dados_media |> 
+  filter(Reporter!="United_Stats")
+
+tarifas_df <- left_join(
+  tarifas_outros_pros_EUA,
+  tarifas_EUA_pros_outros,
+  by = join_by(Reporter==Partner)) |> 
+  reframe(
+    pais = Reporter,
+    ano = year.x,
+    tarifa_outro_pros_EUA = tarifa.x,
+    tarifa_EUA_pro_outro = tarifa.y,
+    diff = tarifa_outro_pros_EUA-tarifa_EUA_pro_outro
+    )
+```
+
+## Gera mapa
+
+```{r fig.height=8, fig.width=10}
+terra <- ne_countries(scale = "medium", returnclass = "sf")
+terra |> 
+  filter(iso_a3!="ATA", pop_est>10^6) |> 
+  select(pais=name_long) |> 
+  left_join(filter(tarifas_df,pais!="United States"), by=join_by(pais)) |> 
+  ggplot(aes(fill=diff)) +
+  geom_sf(color="black") +
+  coord_sf(crs="+proj=robin") +
+  theme_void()
+```
+
