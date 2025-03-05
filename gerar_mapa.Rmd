@@ -21,7 +21,7 @@ library(rnaturalearth)
 
 ```{r}
 p <- "C:/Users/unive/Downloads/"
-p <- "C:/Users/unive/OneDrive/Área de Trabalho/UnB/codigos/Freela Tarifas/mapa_tarifas/dados"
+# p <- "C:/Users/unive/OneDrive/Área de Trabalho/UnB/codigos/Freela Tarifas/mapa_tarifas/dados"
 arquivos <- list.files(path=p, pattern="^WITS", full.names=TRUE)
 tipos <- c("text","numeric","text","text","numeric","numeric","numeric","text")
 tabelas <- purrr::map(
@@ -79,7 +79,7 @@ tarifas_df <- left_join(
 terra <- ne_countries(scale = "medium", returnclass = "sf")
 terra |> 
   filter(iso_a3!="ATA", pop_est>10^6) |> 
-  select(pais=name_long) |> 
+  select(pais=name_sort) |> 
   left_join(filter(tarifas_df,pais!="United States"), by=join_by(pais)) |> 
   ggplot(aes(fill=diff)) +
   geom_sf(color="black") +
